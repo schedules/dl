@@ -1,9 +1,7 @@
 var util = require('util');
 var URL = require('url');
 var fs = require('fs');
-var fetch = require('node-fetch');
-var XMLHttpRequest = global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
-var x2j = require('jgexml/xml2json.js');
+var XMLHttpRequest = global.XMLHttpRequest = require("xhr2");
 
 const INITIAL_SIZE = 512000;
 
@@ -15,9 +13,13 @@ class SourceBuffer extends EventEmitter {
 		super();
 		this._mimetype = mimetype;
 		this._buffer = Buffer.alloc(INITIAL_SIZE,0,'binary');
+		return this;
 	}
 	appendBuffer(data) {
-		console.log(this._mimetype+' '+data.length);
+		console.log(this._mimetype+' '+data.length+' '+typeof data);
+		if (data.length > INITIAL_SIZE) {
+			throw new Error('Buffer size exceeded');
+		}
 		var that = this;
 		if (this._mimetype.startsWith('audio')) {
 			fs.appendFile('./audio.ts.m4a',new Buffer(data,'binary'),'binary',function(){
@@ -40,6 +42,9 @@ class SourceBuffer extends EventEmitter {
 	}
 	get buffered() {
 		return [];
+	}
+	get mode() {
+		return '';//'sequence';
 	}
 }
 
@@ -71,9 +76,6 @@ class MyMediaSource extends EventEmitter {
 		console.log('yelp new buffer for '+mimetype);
 		var nb = new SourceBuffer(mimetype);
 		this._sb[mimetype] = nb;
-		//nb.addListener('updateend',function(){
-		//	console.log('yelp got updateend');
-		//});
 		return nb;
 	}
 	endOfStream(error) {
@@ -143,19 +145,12 @@ dummyElement.nodeName = 'video';
 dummyElement.playbackQuality = {};
 dummyElement.getVideoPlaybackQuality = function() {return dummyElement.playbackQuality};
 
-//dummyElement.addListener('play',function(p){
-//	console.log('Saw the play event');
-//	//console.log(util.inspect(player));
-//});
-
-//require('./dash.all.min.js');
 require('./dash.all.debug.js');
 global.dashjs = window.dashjs;
 
 console.log(util.inspect(dashjs));
 var url = process.argv.length > 2 ? process.argv[2] : "http://dash.edgesuite.net/envivio/EnvivioDash3/manifest.mpd";
 var mp = dashjs.MediaPlayer();
-//console.log(util.inspect(mp));
 player = mp.create();
 
 	player.on('manifestUpdated',function(m){

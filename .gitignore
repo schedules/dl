@@ -1,0 +1,5 @@
+node_modules/
+*debug*
+*.mp4
+*.m4a
+*.sub

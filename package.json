@@ -4,8 +4,7 @@
   "main": "index.js",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "node-fetch": "^1.6.3",
-    "xmldom": "^0.1.27",
-    "xmlhttprequest": "^1.8.0"
+    "xhr2": "^0.1.4",
+    "xmldom": "^0.1.27"
   }
 }
