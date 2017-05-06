@@ -1,17 +1,61 @@
 var util = require('util');
 var URL = require('url');
+var fs = require('fs');
 var fetch = require('node-fetch');
 var XMLHttpRequest = global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 var x2j = require('jgexml/xml2json.js');
 
+const INITIAL_SIZE = 512000;
+
 const EventEmitter = require('events');
 class MyEmitter extends EventEmitter {}
+
+class SourceBuffer extends EventEmitter {
+	constructor(mimetype) {
+		super();
+		this._mimetype = mimetype;
+		this._buffer = Buffer.alloc(INITIAL_SIZE,0,'binary');
+	}
+	appendBuffer(data) {
+		console.log(this._mimetype+' '+data.length);
+		var that = this;
+		if (this._mimetype.startsWith('audio')) {
+			fs.appendFile('./audio.ts.m4a',new Buffer(data,'binary'),'binary',function(){
+				that.emit('onupdateend');
+			});
+		}
+		else if (this._mimetype.startsWith('video')) {
+			fs.appendFile('./video.ts.mp4',new Buffer(data,'binary'),'binary',function(){
+				that.emit('onupdateend');
+			});
+		}
+		else if (this._mimetype.startsWith('text')) {
+			fs.appendFile('./text.sub',data,'binary',function(){
+				that.emit('onupdateend');
+			});
+		}
+		else {
+			console.log('Unhandled mimetype '+this._mimetype);
+		}
+	}
+	get buffered() {
+		return [];
+	}
+}
+
 class MyMediaSource extends EventEmitter {
 	constructor() {
 		super();
 		this.readyState = 'closed';
 		this._sb = {};
 		return this;
+	}
+	get sourceBuffers() {	
+		var a = [];
+		for (let sb in this._sb) {
+			a.push(this._sb[sb]);
+		}
+		return a;
 	}
 	addEventListener(eventName,callback) {
 		this.addListener(eventName,callback);
@@ -25,12 +69,23 @@ class MyMediaSource extends EventEmitter {
 	}
 	addSourceBuffer(mimetype) {
 		console.log('yelp new buffer for '+mimetype);
-		var nb = Buffer.alloc(512000);
+		var nb = new SourceBuffer(mimetype);
 		this._sb[mimetype] = nb;
+		//nb.addListener('updateend',function(){
+		//	console.log('yelp got updateend');
+		//});
 		return nb;
 	}
-
+	endOfStream(error) {
+		console.log('** End of stream: '+error);
+		dummyElement.emit('ended');
+	}
 }
+
+try { fs.unlinkSync('./video.ts.mp4'); } catch (ex) {}
+try { fs.unlinkSync('./audio.ts.m4a'); } catch (ex) {}
+try { fs.unlinkSync('./text.sub'); } catch (ex) {}
+
 const dummyElement = new MyEmitter();
 
 var msArray = [];
@@ -98,7 +153,7 @@ require('./dash.all.debug.js');
 global.dashjs = window.dashjs;
 
 console.log(util.inspect(dashjs));
-var url = "http://dash.edgesuite.net/envivio/EnvivioDash3/manifest.mpd";
+var url = process.argv.length > 2 ? process.argv[2] : "http://dash.edgesuite.net/envivio/EnvivioDash3/manifest.mpd";
 var mp = dashjs.MediaPlayer();
 //console.log(util.inspect(mp));
 player = mp.create();
@@ -108,8 +163,8 @@ player = mp.create();
 		console.log(util.inspect(m));
 	},'dasher');
 	player.on('metricAdded',function(m){
-		console.log('* Got metricadded');
-		console.log(util.inspect(m));
+		//console.log('* Got metricadded');
+		//console.log(util.inspect(m));
 	},'dasher');
 	player.on('loadedMetadata',function(m){
 		console.log('* Got loadedmetadata');
