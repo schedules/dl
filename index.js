@@ -10,6 +10,7 @@ class MyMediaSource extends EventEmitter {
 	constructor() {
 		super();
 		this.readyState = 'closed';
+		this._sb = {};
 		return this;
 	}
 	addEventListener(eventName,callback) {
@@ -22,6 +23,13 @@ class MyMediaSource extends EventEmitter {
 		console.log(util.inspect(eventName));
 		console.log(util.inspect(blah));
 	}
+	addSourceBuffer(mimetype) {
+		console.log('yelp new buffer for '+mimetype);
+		var nb = Buffer.alloc(512000);
+		this._sb[mimetype] = nb;
+		return nb;
+	}
+
 }
 const dummyElement = new MyEmitter();
 
@@ -77,6 +85,8 @@ dummyElement.removeAttribute = function(attr){};
 dummyElement.load = function(l){console.log('**:'+util.inspect(this))};
 dummyElement.canPlayType = function(codec){console.log('Got asked about:'+codec);return 'probably'};
 dummyElement.nodeName = 'video';
+dummyElement.playbackQuality = {};
+dummyElement.getVideoPlaybackQuality = function() {return dummyElement.playbackQuality};
 
 //dummyElement.addListener('play',function(p){
 //	console.log('Saw the play event');
