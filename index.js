@@ -3,10 +3,13 @@ var URL = require('url');
 var fs = require('fs');
 var XMLHttpRequest = global.XMLHttpRequest = require("xhr2");
 
-const INITIAL_SIZE = 512000;
-
 const EventEmitter = require('events');
-class MyEmitter extends EventEmitter {}
+class HTMLVideoElement extends EventEmitter {}
+global.HTMLVideoElement = HTMLVideoElement;
+
+var Hls = require('./hls.js');
+
+const INITIAL_SIZE = 512000;
 
 class SourceBuffer extends EventEmitter {
 	constructor(mimetype) {
@@ -63,13 +66,16 @@ class MyMediaSource extends EventEmitter {
 		return a;
 	}
 	addEventListener(eventName,callback) {
+		console.log('yelp addEventListener: '+eventName);
 		this.addListener(eventName,callback);
 		this.readyState = 'open';
-		this.emit('sourceopen');
+		if (eventName == 'sourceopen') {
+			console.log('Fired: '+eventName);
+			this.emit(eventName);
+		}
 	}
 	removeEventListener(eventName,blah) {
-		console.log('yelp removeEventListener');
-		console.log(util.inspect(eventName));
+		console.log('yelp removeEventListener: '+eventName);
 		console.log(util.inspect(blah));
 	}
 	addSourceBuffer(mimetype) {
@@ -88,18 +94,20 @@ try { fs.unlinkSync('./video.ts.mp4'); } catch (ex) {}
 try { fs.unlinkSync('./audio.ts.m4a'); } catch (ex) {}
 try { fs.unlinkSync('./text.sub'); } catch (ex) {}
 
-const dummyElement = new MyEmitter();
+const dummyElement = new HTMLVideoElement();
 
 var msArray = [];
 
 global.window = {};
-global.window.URL = URL;
+global.window.URL = global.URL = URL;
 global.window.URL.createObjectURL = function(url) {
-	console.log('yelp coURL '+url);
+	console.log('yelp coURL '+util.inspect(url));
 };
 global.window.URL.revokeObjectURL = function(url) {
-	console.log('yelp roURL '+url);
+	console.log('yelp roURL '+util.inspect(url));
 };
+global.window.location = {};
+global.window.location.href = 'http://there.not/';
 global.window.dashjs = {}; // odd but there you go
 global.window.MediaSource = global.MediaSource = function(){
 	var ms = new MyMediaSource();
@@ -114,16 +122,17 @@ global.document.readyState = 'complete';
 global.document.querySelectorAll = function(x){return[dummyElement]};
 global.window.document = global.document;
 global.window.DOMParser = require('xmldom').DOMParser; 
-global.window.performance = {};
+global.window.performance = global.performance = {};
 global.window.performance.now = function() {return new Date();};
+global.window.setTimeout = setTimeout;
+global.window.clearTimeout = clearTimeout;
 global.navigator = {};
 global.navigator.userAgent = 'like Chrome';
+global.self = {};
+global.self.console = console;
 
 var player;
 
-//dummyElement.on('canplay', () => {
-//  console.log('an event occurred!');
-//});
 dummyElement.addEventListener = dummyElement.addListener;
 
 dummyElement.pause = function() {
@@ -145,13 +154,13 @@ dummyElement.nodeName = 'video';
 dummyElement.playbackQuality = {};
 dummyElement.getVideoPlaybackQuality = function() {return dummyElement.playbackQuality};
 
-require('./dash.all.debug.js');
-global.dashjs = window.dashjs;
 
-console.log(util.inspect(dashjs));
-var url = process.argv.length > 2 ? process.argv[2] : "http://dash.edgesuite.net/envivio/EnvivioDash3/manifest.mpd";
-var mp = dashjs.MediaPlayer();
-player = mp.create();
+//----------------------------------------------------------------------------------
+function downloadDash(url) {
+	require('./dash.all.debug.js');
+	global.dashjs = window.dashjs;
+	var mp = dashjs.MediaPlayer();
+	player = mp.create();
 
 	player.on('manifestUpdated',function(m){
 		console.log('* Got manifestUpdated');
@@ -186,44 +195,56 @@ player = mp.create();
 		dummyElement.emit('ended');
 	},'dasher');
 
-var override = {};
-override.displayCaptionsOnTop = function(bool) {};
-//var extended = player.extend('nip',override,true);
-//console.log(util.inspect(extended));
+	var debug = player.getDebug();
+	console.log(util.inspect(debug));
+	debug.setLogToBrowserConsole(true);
+	debug.setLogTimestampVisible(true);
+	debug.log('Testing debug logging');
 
-var debug = player.getDebug();
-console.log(util.inspect(debug));
-debug.setLogToBrowserConsole(true);
-debug.setLogTimestampVisible(true);
-debug.log('Testing debug logging');
+	console.log('About to call init');
+	player.initialize(dummyElement, url, false); // does an attachSource, last param is autoplay
 
-console.log('About to call init');
-player.initialize(dummyElement, url, false); // does an attachSource, last param is autoplay
+	console.log(util.inspect(player));
+	console.log('About to call seek');
+	player.setCurrentTrack(0);
+	dummyElement.emit('seeking');
+	player.seek(0);
+}
 
-console.log(util.inspect(player));
-console.log('About to call seek');
-player.setCurrentTrack(0);
-dummyElement.emit('seeking');
-player.seek(0);
-//for (let i=0;i<60;i++) {
-//	player.seek(i);
-//}
-//player.setCurrentTrack(0);
-//player.setAutoPlay(true);
-//player.play();
+//----------------------------------------------------------------------------------
+function downloadHls(url) {
+	dummyElement.addTextTrack = function(tt){
+		console.log('** Adding textTrack '+util.inspect(tt));
+		return {};
+	};
+	dummyElement.textTracks = {};
+	dummyElement.textTracks.addEventListener = function(e,cb) {
+		console.log('** Adding eventListener: '+e);	
+	};
+	var hls = new Hls({debug:true});
+	console.log('Support sufficient: '+Hls.isSupported());
+	hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+		console.log("video and hls.js are now bound together !");
+    	//hls.loadSource('http://www.streambox.fr/playlists/test_001/stream.m3u8');
+    	hls.loadSource(url);
+	});
+    hls.on(Hls.Events.MANIFEST_PARSED,function() {
+      //video.play();
+	  dummyElement.emit('play');
+	});
+    hls.attachMedia(dummyElement);
+}
 
-//dummyElement.emit('loadedmetadata');
-//dummyElement.emit('canplay');
-//dummyElement.emit('canplaythrough');
-//dummyElement.emit('progress');
-//dummyElement.emit('ended');
-//console.log('dummyElement: '+util.inspect(dummyElement));
+//----------------------------------------------------------------------------------
 
-//player.retrieveManifest(url,function(a,b){
-	//console.log('Callback called');
-	//if (a) console.log('a:'+util.inspect(a));
-	//if (b) console.log('b:'+util.inspect(b));
-//});
+var url = process.argv.length > 2 ? process.argv[2] : "http://dash.edgesuite.net/envivio/EnvivioDash3/manifest.mpd";
+
+if (url.indexOf('.mpd')>0) {
+	downloadDash(url);
+}
+else {
+	downloadHls(url)
+}
 
 process.on('exit',function(){
 	console.log(util.inspect(msArray));
