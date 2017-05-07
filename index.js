@@ -18,6 +18,11 @@ class SourceBuffer extends EventEmitter {
 		this._buffer = Buffer.alloc(INITIAL_SIZE,0,'binary');
 		return this;
 	}
+	addEventListener(eventName, callback) {
+		this.addListener(eventName, callback);
+		console.log('sb addEventListener '+eventName);
+		//if (eventName != 'error') this.emit(eventName);
+	}
 	appendBuffer(data) {
 		console.log(this._mimetype+' '+data.length+' '+typeof data);
 		if (data.length > INITIAL_SIZE) {
@@ -27,16 +32,19 @@ class SourceBuffer extends EventEmitter {
 		if (this._mimetype.startsWith('audio')) {
 			fs.appendFile('./audio.ts.m4a',new Buffer(data,'binary'),'binary',function(){
 				that.emit('onupdateend');
+				that.emit('updateend');
 			});
 		}
 		else if (this._mimetype.startsWith('video')) {
 			fs.appendFile('./video.ts.mp4',new Buffer(data,'binary'),'binary',function(){
 				that.emit('onupdateend');
+				that.emit('updateend');
 			});
 		}
 		else if (this._mimetype.startsWith('text')) {
 			fs.appendFile('./text.sub',data,'binary',function(){
 				that.emit('onupdateend');
+				that.emit('updateend');
 			});
 		}
 		else {
@@ -69,14 +77,16 @@ class MyMediaSource extends EventEmitter {
 		console.log('yelp addEventListener: '+eventName);
 		this.addListener(eventName,callback);
 		this.readyState = 'open';
+		console.log(Object.keys(this._sb).length);
 		if (eventName == 'sourceopen') {
 			console.log('Fired: '+eventName);
-			this.emit(eventName);
+			//this.emit(eventName,this);
 		}
 	}
 	removeEventListener(eventName,blah) {
 		console.log('yelp removeEventListener: '+eventName);
 		console.log(util.inspect(blah));
+		this.removeListener(eventName,blah);
 	}
 	addSourceBuffer(mimetype) {
 		console.log('yelp new buffer for '+mimetype);
@@ -100,11 +110,13 @@ var msArray = [];
 
 global.window = {};
 global.window.URL = global.URL = URL;
-global.window.URL.createObjectURL = function(url) {
-	console.log('yelp coURL '+util.inspect(url));
+global.window.URL.createObjectURL = function(ms) {
+	console.log('yelp coURL '+util.inspect(ms));
+	ms.emit('sourceopen'); //new
+	return URL.parse('test://');
 };
-global.window.URL.revokeObjectURL = function(url) {
-	console.log('yelp roURL '+util.inspect(url));
+global.window.URL.revokeObjectURL = function(ms) {
+	console.log('yelp roURL '+util.inspect(ms));
 };
 global.window.location = {};
 global.window.location.href = 'http://there.not/';
@@ -114,7 +126,7 @@ global.window.MediaSource = global.MediaSource = function(){
 	msArray.push(ms);
 	return ms;
 };
-global.MediaSource.isTypeSupported = function(codec){return true};
+global.MediaSource.isTypeSupported = function(codec){return true}; // we can play anything
 
 global.window.addEventListener = function(event,listener) {console.log('Wanted window event')};
 global.document = {};
@@ -153,7 +165,6 @@ dummyElement.canPlayType = function(codec){console.log('Got asked about:'+codec)
 dummyElement.nodeName = 'video';
 dummyElement.playbackQuality = {};
 dummyElement.getVideoPlaybackQuality = function() {return dummyElement.playbackQuality};
-
 
 //----------------------------------------------------------------------------------
 function downloadDash(url) {
@@ -213,24 +224,31 @@ function downloadDash(url) {
 
 //----------------------------------------------------------------------------------
 function downloadHls(url) {
+	global.navigator.userAgent = 'like Edge';
 	dummyElement.addTextTrack = function(tt){
 		console.log('** Adding textTrack '+util.inspect(tt));
-		return {};
+		return [{}];
 	};
 	dummyElement.textTracks = {};
 	dummyElement.textTracks.addEventListener = function(e,cb) {
 		console.log('** Adding eventListener: '+e);	
 	};
-	var hls = new Hls({debug:true});
+	var hls = new Hls({debug:true,autoStartLoad:true});
 	console.log('Support sufficient: '+Hls.isSupported());
 	hls.on(Hls.Events.MEDIA_ATTACHED, function () {
 		console.log("video and hls.js are now bound together !");
     	//hls.loadSource('http://www.streambox.fr/playlists/test_001/stream.m3u8');
     	hls.loadSource(url);
 	});
-    hls.on(Hls.Events.MANIFEST_PARSED,function() {
+    hls.on(Hls.Events.MANIFEST_PARSED,function(n,m) {
+	  console.log('Got manifest_parsed');
+	  console.log(util.inspect(m));
       //video.play();
-	  dummyElement.emit('play');
+	  dummyElement.paused = false;
+	  dummyElement.currentTime = 0;
+	  dummyElement.emit('pause');
+	  dummyElement.emit('playing');
+	  //hls.startLoad(-1);
 	});
     hls.attachMedia(dummyElement);
 }
