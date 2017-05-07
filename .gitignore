@@ -1,5 +1,5 @@
 node_modules/
-*debug*
+local/
 *.mp4
 *.m4a
 *.sub

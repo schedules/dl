@@ -2,6 +2,25 @@
 # yarn lockfile v1
 
 
+codem-isoboxer@^0.3.2:
+  version "0.3.3"
+  resolved "https://registry.yarnpkg.com/codem-isoboxer/-/codem-isoboxer-0.3.3.tgz#5c81a7d9958da74259459ee2d2e23cae4795539a"
+
+dashjs@^2.5.0:
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/dashjs/-/dashjs-2.5.0.tgz#92853a1e373911eff23f2afa7589817291396225"
+  dependencies:
+    codem-isoboxer "^0.3.2"
+    round10 "^1.0.3"
+
+hls.js@^0.7.6:
+  version "0.7.6"
+  resolved "https://registry.yarnpkg.com/hls.js/-/hls.js-0.7.6.tgz#69075c0e6cb4ec9b5ccd499eb05e5d65ee5b72ca"
+
+round10@^1.0.3:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/round10/-/round10-1.0.3.tgz#86110f46a10874a1931da7fdd5e06d1857a8e4d0"
+
 xhr2@^0.1.4:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/xhr2/-/xhr2-0.1.4.tgz#7f87658847716db5026323812f818cadab387a5f"

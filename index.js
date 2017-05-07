@@ -7,7 +7,7 @@ const EventEmitter = require('events');
 class HTMLVideoElement extends EventEmitter {}
 global.HTMLVideoElement = HTMLVideoElement;
 
-var Hls = require('./hls.js');
+var Hls = require('hls.js');
 
 const INITIAL_SIZE = 512000;
 
@@ -168,7 +168,7 @@ dummyElement.getVideoPlaybackQuality = function() {return dummyElement.playbackQ
 
 //----------------------------------------------------------------------------------
 function downloadDash(url) {
-	require('./dash.all.debug.js');
+	var dashjs = require('dashjs');
 	global.dashjs = window.dashjs;
 	var mp = dashjs.MediaPlayer();
 	player = mp.create();
