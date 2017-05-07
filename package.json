@@ -6,6 +6,7 @@
   "dependencies": {
     "dashjs": "^2.5.0",
     "hls.js": "^0.7.6",
+    "shaka-player": "^2.1.0",
     "xhr2": "^0.1.4",
     "xmldom": "^0.1.27"
   }

@@ -21,6 +21,10 @@ round10@^1.0.3:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/round10/-/round10-1.0.3.tgz#86110f46a10874a1931da7fdd5e06d1857a8e4d0"
 
+shaka-player@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/shaka-player/-/shaka-player-2.1.0.tgz#48bc66bbf0acacc139df26e06889bc61ade3843d"
+
 xhr2@^0.1.4:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/xhr2/-/xhr2-0.1.4.tgz#7f87658847716db5026323812f818cadab387a5f"

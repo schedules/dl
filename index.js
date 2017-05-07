@@ -4,7 +4,9 @@ var fs = require('fs');
 var XMLHttpRequest = global.XMLHttpRequest = require("xhr2");
 
 const EventEmitter = require('events');
-class HTMLVideoElement extends EventEmitter {}
+class HTMLMediaElement extends EventEmitter {}
+class HTMLVideoElement extends HTMLMediaElement {}
+global.HTMLMediaElement = HTMLMediaElement;
 global.HTMLVideoElement = HTMLVideoElement;
 
 var Hls = require('hls.js');
@@ -23,20 +25,24 @@ class SourceBuffer extends EventEmitter {
 		console.log('sb addEventListener '+eventName);
 		//if (eventName != 'error') this.emit(eventName);
 	}
+	abort() {
+		console.log('sb abort');
+	}
 	appendBuffer(data) {
-		console.log(this._mimetype+' '+data.length+' '+typeof data);
-		if (data.length > INITIAL_SIZE) {
+		var nb = new Buffer(data,'binary'));
+		console.log(this._mimetype+' '+nb.length+' '+typeof data);
+		if (nb.length > INITIAL_SIZE) {
 			throw new Error('Buffer size exceeded');
 		}
 		var that = this;
 		if (this._mimetype.startsWith('audio')) {
-			fs.appendFile('./audio.ts.m4a',new Buffer(data,'binary'),'binary',function(){
+			fs.appendFile('./audio.ts.m4a',nb,'binary',function(){
 				that.emit('onupdateend');
 				that.emit('updateend');
 			});
 		}
 		else if (this._mimetype.startsWith('video')) {
-			fs.appendFile('./video.ts.mp4',new Buffer(data,'binary'),'binary',function(){
+			fs.appendFile('./video.ts.mp4',nb,'binary',function(){
 				that.emit('onupdateend');
 				that.emit('updateend');
 			});
@@ -64,6 +70,7 @@ class MyMediaSource extends EventEmitter {
 		super();
 		this.readyState = 'closed';
 		this._sb = {};
+		this._streams=0;
 		return this;
 	}
 	get sourceBuffers() {	
@@ -90,13 +97,18 @@ class MyMediaSource extends EventEmitter {
 	}
 	addSourceBuffer(mimetype) {
 		console.log('yelp new buffer for '+mimetype);
+		this._streams++;
 		var nb = new SourceBuffer(mimetype);
 		this._sb[mimetype] = nb;
 		return nb;
 	}
 	endOfStream(error) {
 		console.log('** End of stream: '+error);
-		dummyElement.emit('ended');
+		this._streams--;
+		if (this._streams<=0) {
+			this.emit('sourceended');
+			dummyElement.emit('ended');
+		}
 	}
 }
 
@@ -133,7 +145,7 @@ global.document = {};
 global.document.readyState = 'complete';
 global.document.querySelectorAll = function(x){return[dummyElement]};
 global.window.document = global.document;
-global.window.DOMParser = require('xmldom').DOMParser; 
+global.window.DOMParser = global.DOMParser = require('xmldom').DOMParser; 
 global.window.performance = global.performance = {};
 global.window.performance.now = function() {return new Date();};
 global.window.setTimeout = setTimeout;
@@ -142,6 +154,9 @@ global.navigator = {};
 global.navigator.userAgent = 'like Chrome';
 global.self = {};
 global.self.console = console;
+
+//var shaka = require('shaka-player/dist/shaka-player.compiled.debug.js');
+var shaka = require('shaka-player');
 
 var player;
 
@@ -165,6 +180,11 @@ dummyElement.canPlayType = function(codec){console.log('Got asked about:'+codec)
 dummyElement.nodeName = 'video';
 dummyElement.playbackQuality = {};
 dummyElement.getVideoPlaybackQuality = function() {return dummyElement.playbackQuality};
+dummyElement.textTracks = [];
+dummyElement.addTextTrack = function(tt){
+	console.log('** Adding textTrack '+util.inspect(tt));
+	return [{}];
+};
 
 //----------------------------------------------------------------------------------
 function downloadDash(url) {
@@ -225,14 +245,10 @@ function downloadDash(url) {
 //----------------------------------------------------------------------------------
 function downloadHls(url) {
 	global.navigator.userAgent = 'like Edge';
-	dummyElement.addTextTrack = function(tt){
-		console.log('** Adding textTrack '+util.inspect(tt));
-		return [{}];
-	};
-	dummyElement.textTracks = {};
-	dummyElement.textTracks.addEventListener = function(e,cb) {
-		console.log('** Adding eventListener: '+e);	
-	};
+	//dummyElement.textTracks = {};
+	//dummyElement.textTracks.addEventListener = function(e,cb) {
+	//	console.log('** Adding eventListener: '+e);	
+	//};
 	var hls = new Hls({debug:true,autoStartLoad:true});
 	console.log('Support sufficient: '+Hls.isSupported());
 	hls.on(Hls.Events.MEDIA_ATTACHED, function () {
@@ -254,11 +270,58 @@ function downloadHls(url) {
 }
 
 //----------------------------------------------------------------------------------
+function initShaka(manifestUri) {
+ // Create a Player instance.
+  //var video = document.getElementById('video');
+  var video = dummyElement;
+
+  var splayer = new shaka.Player(video);
+
+  // Attach player to the window to make it easy to access in the JS console.
+  window.player = splayer;
+
+  // Listen for error events.
+  splayer.addEventListener('error', onErrorEvent);
+
+  // Try to load a manifest.
+  // This is an asynchronous process.
+  splayer.load(manifestUri).then(function() {
+    // This runs if the asynchronous load is successful.
+    console.log('The video has now been loaded!');
+  }).catch(onError);  // onError is executed if the asynchronous load fails.
+}
+
+function onErrorEvent(event) {
+  // Extract the shaka.util.Error object from the event.
+  onError(event.detail);
+}
+
+function onError(error) {
+  // Log the error.
+  console.error('Error code', error.code, 'object', error);
+}
+
+//----------------------------------------------------------------------------------
+function downloadShaka(url) {
+  shaka.polyfill.installAll();
+
+  // Check to see if the browser supports the basic APIs Shaka needs.
+  if (shaka.Player.isBrowserSupported()) {
+    // Everything looks good!
+    initShaka(url);
+  } else {
+    // This browser does not have the minimum set of APIs we need.
+    console.error('Browser not supported!');
+  }
+}
+
+//----------------------------------------------------------------------------------
 
 var url = process.argv.length > 2 ? process.argv[2] : "http://dash.edgesuite.net/envivio/EnvivioDash3/manifest.mpd";
 
 if (url.indexOf('.mpd')>0) {
-	downloadDash(url);
+	//downloadDash(url);
+	downloadShaka(url);
 }
 else {
 	downloadHls(url)
