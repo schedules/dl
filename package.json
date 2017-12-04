@@ -4,7 +4,7 @@
   "main": "index.js",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "dashjs": "^2.5.0",
+    "dashjs": "2.5.0",
     "hls.js": "^0.7.6",
     "xhr2": "^0.1.4",
     "xmldom": "^0.1.27"
